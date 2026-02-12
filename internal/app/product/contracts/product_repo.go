@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"context"
+	"time"
 
 	"product-catalog-service/internal/app/product/domain"
 
@@ -41,5 +42,5 @@ type OutboxEvent struct {
 	EventType   string
 	AggregateID string
 	Payload     string // JSON-serialized payload
-	CreatedAt   string
+	CreatedAt   time.Time
 }

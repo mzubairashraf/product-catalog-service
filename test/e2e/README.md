@@ -4,12 +4,89 @@ This directory contains end-to-end tests that test the complete flow through the
 
 ## Overview
 
-E2E tests verify:
-- **Complete request/response flows** through use cases
-- **Database persistence** using actual Spanner
-- **Transactional consistency** (Outbox pattern)
-- **Golden Mutation Pattern** implementation
-- **Integration between all layers**: Domain → Application → Infrastructure
+E2E tests verify the complete application stack by testing use cases directly against a real Spanner database (emulator). These tests follow the exact pattern specified in requirements.md.
+
+### Test Coverage - All Main Flows from Requirements
+
+#### ✅ Product Creation Flow (`TestProductCreationFlow`)
+**Requirements**: Create products with name, description, base price, and category
+- Setup: Real Spanner connection (emulator), real repos, real usecases
+- Test: Create product via create_product use case
+- Verify:
+  - Product created successfully with all fields
+  - Query returns correct data (name, description, category, price, status)
+  - Product starts in `inactive` status
+  - Outbox event created: `product.created`
+  - Event stored atomically with product
+
+#### ✅ Product Update Flow (`TestProductUpdateFlow`)
+**Requirements**: Update product details (name, description, category)
+- Test: Create product → Update details via update_product use case
+- Verify:
+  - All fields updated correctly
+  - Change tracking working (only modified fields updated)
+  - Outbox events: `product.created` + `product.updated`
+  - Both events persisted
+
+#### ✅ Discount Application Flow (`TestDiscountApplicationFlow`)
+**Requirements**: Apply percentage-based discounts with start/end dates, precise decimal arithmetic
+- Test: Create product → Activate → Apply 20% discount
+- Verify:
+  - Discount applied successfully with correct percentage
+  - Effective price calculated correctly (base price - discount)
+  - Discount stored with start/end dates
+  - Outbox event: `discount.applied`
+  - Pricing uses precise decimal arithmetic
+
+#### ✅ Product Activation/Deactivation Flow (`TestProductActivationDeactivationFlow`)
+**Requirements**: Activate/Deactivate products
+- Test: Create product → Activate → Deactivate
+- Verify:
+  - Product starts as `inactive`
+  - Activation changes status to `active`
+  - Deactivation changes status back to `inactive`
+  - Outbox events: `product.created`, `product.activated`, `product.deactivated`
+  - All state transitions captured in events
+
+#### ✅ Business Rule Validation (`TestBusinessRuleValidation`)
+**Requirements**: Proper domain validation and error handling
+- Test: Multiple validation scenarios
+- Verify:
+  - ❌ Cannot apply discount to inactive product (`ErrProductNotActive`)
+  - ❌ Cannot create product with negative price (`ErrInvalidMoneyValue`)
+  - ❌ Cannot apply discount > 100% (`ErrInvalidDiscountPercentage`)
+  - ❌ Cannot apply discount with end before start (`ErrInvalidDiscountPeriod`)
+  - ❌ Cannot update product with empty name (`ErrInvalidProductName`)
+  - All domain errors properly captured and returned
+
+#### ✅ Product Query Flow (`TestListProductsQuery`)
+**Requirements**: Get product by ID with effective price, list active products with pagination, filter by category
+- Test: Create multiple products → Query via list_products
+- Verify:
+  - All products returned correctly
+  - Total count accurate
+  - Pagination parameters work
+  - Read model bypasses domain for optimization (CQRS)
+
+#### ✅ Transactional Outbox (`TestTransactionalOutbox`)
+**Requirements**: Publish events reliably using transactional outbox pattern
+- Test: Create product and verify atomic consistency
+- Verify:
+  - Product and outbox event both exist (atomic transaction)
+  - No product without event or vice versa
+  - Golden Mutation Pattern: mutations collected and applied atomically
+  - Transaction commits or rolls back as a unit
+
+### Architecture Patterns Verified
+
+These E2E tests validate all critical architectural patterns:
+
+1. **Domain Layer Purity**: Domain logic executed without infrastructure dependencies
+2. **CQRS Pattern**: Commands through aggregates, queries through read models
+3. **Golden Mutation Pattern**: Repositories return mutations, committer applies atomically
+4. **Transactional Outbox**: Events stored atomically with state changes
+5. **Change Tracking**: Only modified fields generate database updates
+6. **Repository Pattern**: Domain entities mapped to database models correctly
 
 ## Running E2E Tests
 

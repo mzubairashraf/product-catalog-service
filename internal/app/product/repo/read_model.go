@@ -1,14 +1,17 @@
 package repo
 
 import (
-	"cloud.google.com/go/spanner"
 	"context"
 	"fmt"
+	"time"
+
+	"cloud.google.com/go/spanner"
 	"google.golang.org/api/iterator"
+	"google.golang.org/grpc/codes"
+
 	"product-catalog-service/internal/app/product/contracts"
 	"product-catalog-service/internal/app/product/domain"
 	"product-catalog-service/internal/models/m_product"
-	"time"
 )
 
 // ProductReadModel implements optimized read operations
@@ -181,5 +184,3 @@ func buildColumnList() string {
 
 // Ensure ProductReadModel implements the interface
 var _ contracts.ReadModel = (*ProductReadModel)(nil)
-
-import "google.golang.org/grpc/codes"

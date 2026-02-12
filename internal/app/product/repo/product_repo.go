@@ -3,205 +3,195 @@ package repo
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"cloud.google.com/go/spanner"
+	"google.golang.org/grpc/codes"
+
 	"product-catalog-service/internal/app/product/contracts"
 	"product-catalog-service/internal/app/product/domain"
 	"product-catalog-service/internal/models/m_product"
 )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-import "google.golang.org/grpc/codes"var _ contracts.ProductRepository = (*ProductRepo)(nil)// Ensure ProductRepo implements the interface}	return product, nil	)		archivedAt,		data.UpdatedAt,		data.CreatedAt,		domain.ProductStatus(data.Status),		discount,		basePrice,		data.Category,		data.Description,		data.Name,		data.ProductID,	product := domain.LoadProduct(	// Load product (no events generated for loaded aggregates)	}		archivedAt = &data.ArchivedAt.Time	if data.ArchivedAt.Valid {	var archivedAt *time.Time	// Reconstruct archived timestamp	}		}			return nil, fmt.Errorf("invalid discount: %w", err)		if err != nil {		)			data.DiscountEndDate.Time,			data.DiscountStartDate.Time,			int(data.DiscountPercent.Int64),		discount, err = domain.NewDiscount(	if data.DiscountPercent.Valid {	var discount *domain.Discount	// Reconstruct discount if present	}		return nil, fmt.Errorf("invalid base price: %w", err)	if err != nil {	basePrice, err := domain.NewMoney(data.BasePriceNumerator, data.BasePriceDenominator)	// Reconstruct base pricefunc (r *ProductRepo) dataToDomain(data *m_product.Data) (*domain.Product, error) {// dataToDomain converts database model to domain product}	return data	}		data.ArchivedAt = spanner.NullTime{Time: *archivedAt, Valid: true}	if archivedAt := product.ArchivedAt(); archivedAt != nil {	}		data.DiscountEndDate = spanner.NullTime{Time: discount.EndDate(), Valid: true}		data.DiscountStartDate = spanner.NullTime{Time: discount.StartDate(), Valid: true}		data.DiscountPercent = spanner.NullInt64{Int64: int64(discount.Percentage()), Valid: true}	if discount := product.Discount(); discount != nil {	}		UpdatedAt:            product.UpdatedAt(),		CreatedAt:            product.CreatedAt(),		Status:               string(product.Status()),		BasePriceDenominator: product.BasePrice().Denominator(),		BasePriceNumerator:   product.BasePrice().Numerator(),		Category:             product.Category(),		Description:          product.Description(),		Name:                 product.Name(),		ProductID:            product.ID(),	data := &m_product.Data{func (r *ProductRepo) domainToData(product *domain.Product) *m_product.Data {// domainToData converts a domain product to database model}	return true, nil		}		return false, fmt.Errorf("failed to read product id: %w", err)	if err := row.Column(0, &id); err != nil {	var id string		}		return false, fmt.Errorf("failed to check product existence: %w", err)		}			return false, nil		if spanner.ErrCode(err) == codes.NotFound {	if err != nil {	)		[]string{m_product.ProductID},		spanner.Key{productID},		m_product.TableName,		ctx,	row, err := r.client.Single().ReadRow(func (r *ProductRepo) Exists(ctx context.Context, productID string) (bool, error) {// Exists checks if a product exists}	return r.dataToDomain(data)	}		return nil, fmt.Errorf("failed to unmarshal product: %w", err)	if err := row.ToStruct(data); err != nil {	data := &m_product.Data{}	}		return nil, fmt.Errorf("failed to read product: %w", err)		}			return nil, domain.ErrProductNotFound		if spanner.ErrCode(err) == codes.NotFound {	if err != nil {	)		m_product.AllColumns(),		spanner.Key{productID},		m_product.TableName,		ctx,	row, err := r.client.Single().ReadRow(func (r *ProductRepo) FindByID(ctx context.Context, productID string) (*domain.Product, error) {// FindByID retrieves a product by ID for write operations}	return r.model.UpdateMut(product.ID(), updates)	}		return nil	if len(updates) == 0 {	updates[m_product.UpdatedAt] = product.UpdatedAt()	// Always update the timestamp	}		}			updates[m_product.ArchivedAt] = *product.ArchivedAt()		if product.Status() == domain.ProductStatusArchived && product.ArchivedAt() != nil {		updates[m_product.Status] = string(product.Status())	if product.Changes().Dirty(domain.FieldStatus) {	}		}			updates[m_product.DiscountEndDate] = spanner.NullTime{}			updates[m_product.DiscountStartDate] = spanner.NullTime{}			updates[m_product.DiscountPercent] = spanner.NullInt64{}			// Remove discount		} else {			updates[m_product.DiscountEndDate] = discount.EndDate()			updates[m_product.DiscountStartDate] = discount.StartDate()			updates[m_product.DiscountPercent] = int64(discount.Percentage())		if discount := product.Discount(); discount != nil {	if product.Changes().Dirty(domain.FieldDiscount) {	}		updates[m_product.BasePriceDenominator] = product.BasePrice().Denominator()		updates[m_product.BasePriceNumerator] = product.BasePrice().Numerator()	if product.Changes().Dirty(domain.FieldBasePrice) {	}		updates[m_product.Category] = product.Category()	if product.Changes().Dirty(domain.FieldCategory) {	}		updates[m_product.Description] = product.Description()	if product.Changes().Dirty(domain.FieldDescription) {	}		updates[m_product.Name] = product.Name()	if product.Changes().Dirty(domain.FieldName) {	updates := make(map[string]interface{})	}		return nil	if !product.Changes().HasChanges() {func (r *ProductRepo) UpdateMut(product *domain.Product) *spanner.Mutation {// Only updates fields marked as dirty in the change tracker// UpdateMut returns a mutation for updating an existing product}	return r.model.InsertMut(data)	data := r.domainToData(product)func (r *ProductRepo) InsertMut(product *domain.Product) *spanner.Mutation {// InsertMut returns a mutation for inserting a new product}	}		model:  m_product.NewModel(),		client: client,	return &ProductRepo{func NewProductRepo(client *spanner.Client) *ProductRepo {// NewProductRepo creates a new product repository}	model  *m_product.Model	client *spanner.Clienttype ProductRepo struct {// ProductRepo is the Spanner implementation of ProductRepository)	"time"	"product-catalog-service/internal/models/m_product"	"product-catalog-service/internal/app/product/domain"	"product-catalog-service/internal/app/product/contracts"	"fmt"
+// ProductRepo is the Spanner implementation of ProductRepository
+type ProductRepo struct {
+	client *spanner.Client
+	model  *m_product.Model
+}
+
+// NewProductRepo creates a new product repository
+func NewProductRepo(client *spanner.Client) *ProductRepo {
+	return &ProductRepo{
+		client: client,
+		model:  m_product.NewModel(),
+	}
+}
+
+// FindByID retrieves a product by ID for write operations
+func (r *ProductRepo) FindByID(ctx context.Context, productID string) (*domain.Product, error) {
+	row, err := r.client.Single().ReadRow(
+		ctx,
+		m_product.TableName,
+		spanner.Key{productID},
+		m_product.AllColumns(),
+	)
+	if err != nil {
+		if spanner.ErrCode(err) == codes.NotFound {
+			return nil, domain.ErrProductNotFound
+		}
+		return nil, fmt.Errorf("failed to read product: %w", err)
+	}
+
+	data := &m_product.Data{}
+	if err := row.ToStruct(data); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal product: %w", err)
+	}
+
+	return r.dataToDomain(data)
+}
+
+// Exists checks if a product exists
+func (r *ProductRepo) Exists(ctx context.Context, productID string) (bool, error) {
+	row, err := r.client.Single().ReadRow(
+		ctx,
+		m_product.TableName,
+		spanner.Key{productID},
+		[]string{m_product.ProductID},
+	)
+	if err != nil {
+		if spanner.ErrCode(err) == codes.NotFound {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to check product existence: %w", err)
+	}
+
+	var id string
+	if err := row.Column(0, &id); err != nil {
+		return false, fmt.Errorf("failed to read product id: %w", err)
+	}
+
+	return true, nil
+}
+
+// InsertMut returns a mutation for inserting a new product
+func (r *ProductRepo) InsertMut(product *domain.Product) *spanner.Mutation {
+	data := r.domainToData(product)
+	return r.model.InsertMut(data)
+}
+
+// UpdateMut returns a mutation for updating an existing product
+func (r *ProductRepo) UpdateMut(product *domain.Product) *spanner.Mutation {
+	if !product.Changes().HasChanges() {
+		return nil
+	}
+
+	updates := make(map[string]interface{})
+
+	if product.Changes().Dirty(domain.FieldName) {
+		updates[m_product.Name] = product.Name()
+	}
+	if product.Changes().Dirty(domain.FieldDescription) {
+		updates[m_product.Description] = product.Description()
+	}
+	if product.Changes().Dirty(domain.FieldCategory) {
+		updates[m_product.Category] = product.Category()
+	}
+	if product.Changes().Dirty(domain.FieldBasePrice) {
+		updates[m_product.BasePriceNumerator] = product.BasePrice().Numerator()
+		updates[m_product.BasePriceDenominator] = product.BasePrice().Denominator()
+	}
+	if product.Changes().Dirty(domain.FieldDiscount) {
+		if discount := product.Discount(); discount != nil {
+			updates[m_product.DiscountPercent] = int64(discount.Percentage())
+			updates[m_product.DiscountStartDate] = discount.StartDate()
+			updates[m_product.DiscountEndDate] = discount.EndDate()
+		} else {
+			updates[m_product.DiscountPercent] = spanner.NullInt64{}
+			updates[m_product.DiscountStartDate] = spanner.NullTime{}
+			updates[m_product.DiscountEndDate] = spanner.NullTime{}
+		}
+	}
+	if product.Changes().Dirty(domain.FieldStatus) {
+		updates[m_product.Status] = string(product.Status())
+		if product.Status() == domain.ProductStatusArchived && product.ArchivedAt() != nil {
+			updates[m_product.ArchivedAt] = *product.ArchivedAt()
+		}
+	}
+
+	updates[m_product.UpdatedAt] = product.UpdatedAt()
+
+	if len(updates) == 0 {
+		return nil
+	}
+
+	return r.model.UpdateMut(product.ID(), updates)
+}
+
+// domainToData converts a domain product to database model
+func (r *ProductRepo) domainToData(product *domain.Product) *m_product.Data {
+	data := &m_product.Data{
+		ProductID:            product.ID(),
+		Name:                 product.Name(),
+		Description:          product.Description(),
+		Category:             product.Category(),
+		BasePriceNumerator:   product.BasePrice().Numerator(),
+		BasePriceDenominator: product.BasePrice().Denominator(),
+		Status:               string(product.Status()),
+		CreatedAt:            product.CreatedAt(),
+		UpdatedAt:            product.UpdatedAt(),
+	}
+
+	if discount := product.Discount(); discount != nil {
+		data.DiscountPercent = spanner.NullInt64{Int64: int64(discount.Percentage()), Valid: true}
+		data.DiscountStartDate = spanner.NullTime{Time: discount.StartDate(), Valid: true}
+		data.DiscountEndDate = spanner.NullTime{Time: discount.EndDate(), Valid: true}
+	}
+
+	if archivedAt := product.ArchivedAt(); archivedAt != nil {
+		data.ArchivedAt = spanner.NullTime{Time: *archivedAt, Valid: true}
+	}
+
+	return data
+}
+
+// dataToDomain converts database model to domain product
+func (r *ProductRepo) dataToDomain(data *m_product.Data) (*domain.Product, error) {
+	basePrice, err := domain.NewMoney(data.BasePriceNumerator, data.BasePriceDenominator)
+	if err != nil {
+		return nil, fmt.Errorf("invalid base price: %w", err)
+	}
+
+	var discount *domain.Discount
+	if data.DiscountPercent.Valid {
+		discount, err = domain.NewDiscount(
+			int(data.DiscountPercent.Int64),
+			data.DiscountStartDate.Time,
+			data.DiscountEndDate.Time,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("invalid discount: %w", err)
+		}
+	}
+
+	var archivedAt *time.Time
+	if data.ArchivedAt.Valid {
+		archivedAt = &data.ArchivedAt.Time
+	}
+
+	product := domain.LoadProduct(
+		data.ProductID,
+		data.Name,
+		data.Description,
+		data.Category,
+		basePrice,
+		discount,
+		domain.ProductStatus(data.Status),
+		data.CreatedAt,
+		data.UpdatedAt,
+		archivedAt,
+	)
+
+	return product, nil
+}
+
+var _ contracts.ProductRepository = (*ProductRepo)(nil)
