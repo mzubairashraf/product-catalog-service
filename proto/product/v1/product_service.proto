@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package product.v1;
+
+option go_package = "product-catalog-service/proto/product/v1;productpb";
+
+// ProductService provides operations for managing products
+service ProductService {
+    // Commands (Write Operations)
+    rpc CreateProduct(CreateProductRequest) returns (CreateProductReply);
+    rpc UpdateProduct(UpdateProductRequest) returns (UpdateProductReply);
+    rpc ActivateProduct(ActivateProductRequest) returns (ActivateProductReply);
+    rpc DeactivateProduct(DeactivateProductRequest) returns (DeactivateProductReply);
+    rpc ApplyDiscount(ApplyDiscountRequest) returns (ApplyDiscountReply);
+    rpc RemoveDiscount(RemoveDiscountRequest) returns (RemoveDiscountReply);
+
+    // Queries (Read Operations)
+    rpc GetProduct(GetProductRequest) returns (GetProductReply);
+    rpc ListProducts(ListProductsRequest) returns (ListProductsReply);
+}
+
+// ===== Create Product =====
+
+message CreateProductRequest {
+    string name = 1;
+    string description = 2;
+    string category = 3;
+    int64 price_numerator = 4;
+    int64 price_denominator = 5;
+}
+
+message CreateProductReply {
+    string product_id = 1;
+}
+
+// ===== Update Product =====
+
+message UpdateProductRequest {
+    string product_id = 1;
+    string name = 2;
+    string description = 3;
+    string category = 4;
+}
+
+message UpdateProductReply {}
+
+// ===== Activate Product =====
+
+message ActivateProductRequest {
+    string product_id = 1;
+}
+
+message ActivateProductReply {}
+
+// ===== Deactivate Product =====
+
+message DeactivateProductRequest {
+    string product_id = 1;
+}
+
+message DeactivateProductReply {}
+
+// ===== Apply Discount =====
+
+message ApplyDiscountRequest {
+    string product_id = 1;
+    int32 discount_percent = 2;
+    int64 start_date_unix = 3; // Unix timestamp
+    int64 end_date_unix = 4;   // Unix timestamp
+}
+
+message ApplyDiscountReply {}
+
+// ===== Remove Discount =====
+
+message RemoveDiscountRequest {
+    string product_id = 1;
+}
+
+message RemoveDiscountReply {}
+
+// ===== Get Product =====
+
+message GetProductRequest {
+    string product_id = 1;
+}
+
+message GetProductReply {
+    Product product = 1;
+}
+
+// ===== List Products =====
+
+message ListProductsRequest {
+    string category = 1;  // Optional filter
+    string status = 2;    // Optional filter (active, inactive)
+    int32 limit = 3;
+    int32 offset = 4;
+}
+
+message ListProductsReply {
+    repeated Product products = 1;
+    int32 total_count = 2;
+    bool has_more = 3;
+}
+
+// ===== Data Models =====
+
+message Product {
+    string product_id = 1;
+    string name = 2;
+    string description = 3;
+    string category = 4;
+    Money base_price = 5;
+    Discount discount = 6;
+    Money effective_price = 7;
+    string status = 8;
+    int64 created_at_unix = 9;
+    int64 updated_at_unix = 10;
+}
+
+message Money {
+    int64 numerator = 1;
+    int64 denominator = 2;
+    double display_value = 3;
+}
+
+message Discount {
+    int32 percentage = 1;
+    int64 start_date_unix = 2;
+    int64 end_date_unix = 3;
+    bool is_active = 4;
+}
