@@ -107,3 +107,7 @@ The end-to-end tests use the same wiring (`internal/bootstrap`) as the server bi
 - An `ArchiveProduct` RPC. The aggregate supports archiving and the rule is tested, but it is not exposed.
 - Scheduling a discount for the future: a discount must be active when it is applied.
 - Offset paging is simple but reads every skipped row; a large catalogue would use a keyset cursor.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
