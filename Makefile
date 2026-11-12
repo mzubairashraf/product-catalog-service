@@ -1,61 +1,36 @@
-.PHONY: help proto deps build run test clean docker-up docker-down migrate
+EMULATOR ?= localhost:9010
+DATABASE ?= projects/test-project/instances/test-instance/databases/product-catalog
 
-help: ## Display this help message
-	@echo "Available commands:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
+.PHONY: help test e2e up down migrate run proto fmt vet
 
-deps: ## Download dependencies
-	go mod download
-	go mod tidy
+help: ## List targets
+	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-10s %s\n", $$1, $$2}'
 
-proto: ## Generate protobuf code
+test: ## Unit and transport tests (no Docker needed)
+	go test -race -count=1 ./...
+
+up: ## Start the Spanner emulator
+	docker compose up -d
+
+down: ## Stop the Spanner emulator
+	docker compose down
+
+e2e: up ## End-to-end tests against the emulator
+	SPANNER_EMULATOR_HOST=$(EMULATOR) go test -count=1 -v ./test/e2e/...
+
+migrate: up ## Create the instance and database on the emulator
+	SPANNER_EMULATOR_HOST=$(EMULATOR) SPANNER_DATABASE=$(DATABASE) go run ./cmd/migrate
+
+run: migrate ## Run the server against the emulator
+	SPANNER_EMULATOR_HOST=$(EMULATOR) SPANNER_DATABASE=$(DATABASE) go run ./cmd/server
+
+proto: ## Regenerate gRPC code (needs protoc, protoc-gen-go, protoc-gen-go-grpc)
 	protoc --go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
 		proto/product/v1/product_service.proto
 
-build: ## Build the server binary
-	go build -o bin/server cmd/server/main.go
+fmt: ## Format
+	gofmt -w .
 
-run: ## Run the server
-	go run cmd/server/main.go
-
-test: ## Run tests
-	go test -v -race -coverprofile=coverage.out ./...
-
-test-coverage: test ## Generate test coverage report
-	go tool cover -html=coverage.out
-
-docker-up: ## Start Spanner emulator
-	docker-compose up -d
-	@echo "Waiting for Spanner emulator to be ready..."
-	@sleep 5
-
-docker-down: ## Stop Spanner emulator
-	docker-compose down
-
-migrate: ## Run database migrations (requires running emulator)
-	@echo "Running migrations against Spanner emulator..."
-	@gcloud spanner databases create product-catalog \
-		--instance=test-instance \
-		--project=test-project \
-		--ddl-file=migrations/001_initial_schema.sql || true
-
-clean: ## Clean build artifacts
-	rm -rf bin/
-	rm -f coverage.out
-
-lint: ## Run linters
-	golangci-lint run ./...
-
-fmt: ## Format code
-	gofmt -s -w .
-
-# Include E2E test targets
-include Makefile.e2e
-	go fmt ./...
-	gofmt -s -w .
-
-vet: ## Run go vet
+vet: ## Vet
 	go vet ./...
-
-all: deps proto build ## Build everything

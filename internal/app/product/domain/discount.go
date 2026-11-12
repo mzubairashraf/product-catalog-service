@@ -12,11 +12,11 @@ type Discount struct {
 
 // NewDiscount creates a new discount with validation
 func NewDiscount(percentage int, startDate, endDate time.Time) (*Discount, error) {
-	if percentage < 0 || percentage > 100 {
+	if percentage < 1 || percentage > 100 {
 		return nil, ErrDiscountPercentInvalid
 	}
 
-	if endDate.Before(startDate) {
+	if !endDate.After(startDate) {
 		return nil, ErrInvalidDiscountPeriod
 	}
 
@@ -42,9 +42,10 @@ func (d *Discount) EndDate() time.Time {
 	return d.endDate
 }
 
-// IsValidAt checks if the discount is valid at the given time
+// IsValidAt checks if the discount is valid at the given time. The period is
+// half-open, [start, end): back-to-back discounts never overlap at the boundary.
 func (d *Discount) IsValidAt(now time.Time) bool {
-	return !now.Before(d.startDate) && !now.After(d.endDate)
+	return !now.Before(d.startDate) && now.Before(d.endDate)
 }
 
 // IsActive checks if the discount is currently active

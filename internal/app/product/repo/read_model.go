@@ -9,21 +9,24 @@ import (
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 
-	"product-catalog-service/internal/app/product/contracts"
-	"product-catalog-service/internal/app/product/domain"
-	"product-catalog-service/internal/models/m_product"
+	"github.com/mzubairashraf/product-catalog-service/internal/app/product/contracts"
+	"github.com/mzubairashraf/product-catalog-service/internal/app/product/domain"
+	"github.com/mzubairashraf/product-catalog-service/internal/models/m_product"
+	"github.com/mzubairashraf/product-catalog-service/internal/pkg/clock"
 )
 
 // ProductReadModel implements optimized read operations
 // This bypasses the domain layer for query performance
 type ProductReadModel struct {
 	client *spanner.Client
+	clock  clock.Clock
 }
 
 // NewProductReadModel creates a new read model
-func NewProductReadModel(client *spanner.Client) *ProductReadModel {
+func NewProductReadModel(client *spanner.Client, clk clock.Clock) *ProductReadModel {
 	return &ProductReadModel{
 		client: client,
+		clock:  clk,
 	}
 }
 
@@ -47,7 +50,7 @@ func (rm *ProductReadModel) GetProduct(ctx context.Context, productID string) (*
 		return nil, fmt.Errorf("failed to unmarshal product: %w", err)
 	}
 
-	return rm.dataToDTO(data, time.Now()), nil
+	return rm.dataToDTO(data, rm.clock.Now()), nil
 }
 
 // ListProducts retrieves products with pagination and filtering
@@ -69,10 +72,11 @@ func (rm *ProductReadModel) ListProducts(ctx context.Context, req contracts.List
 	// Add ordering
 	query += ` ORDER BY created_at DESC`
 
-	// Add pagination
+	// Add pagination. One row more than the page is requested so that
+	// "has more" is known without a second COUNT query.
 	if req.Limit > 0 {
 		query += ` LIMIT @limit`
-		params["limit"] = req.Limit
+		params["limit"] = req.Limit + 1
 	}
 	if req.Offset > 0 {
 		query += ` OFFSET @offset`
@@ -88,7 +92,7 @@ func (rm *ProductReadModel) ListProducts(ctx context.Context, req contracts.List
 	defer iter.Stop()
 
 	var products []*contracts.ProductDTO
-	now := time.Now()
+	now := rm.clock.Now()
 
 	for {
 		row, err := iter.Next()
@@ -107,16 +111,15 @@ func (rm *ProductReadModel) ListProducts(ctx context.Context, req contracts.List
 		products = append(products, rm.dataToDTO(data, now))
 	}
 
-	// Check if there are more results
 	hasMore := false
-	if req.Limit > 0 && len(products) == req.Limit {
+	if req.Limit > 0 && len(products) > req.Limit {
 		hasMore = true
+		products = products[:req.Limit]
 	}
 
 	return &contracts.ProductList{
-		Products:   products,
-		TotalCount: len(products),
-		HasMore:    hasMore,
+		Products: products,
+		HasMore:  hasMore,
 	}, nil
 }
 
@@ -137,30 +140,30 @@ func (rm *ProductReadModel) dataToDTO(data *m_product.Data, now time.Time) *cont
 		UpdatedAt: data.UpdatedAt,
 	}
 
-	// Add discount if present
+	dto.EffectivePrice = dto.BasePrice
+
 	if data.DiscountPercent.Valid {
-		isActive := !now.Before(data.DiscountStartDate.Time) && !now.After(data.DiscountEndDate.Time)
+		// The same half-open [start, end) rule as domain.Discount.
+		isActive := !now.Before(data.DiscountStartDate.Time) && now.Before(data.DiscountEndDate.Time)
 		dto.Discount = &contracts.DiscountDTO{
 			Percentage: int(data.DiscountPercent.Int64),
 			StartDate:  data.DiscountStartDate.Time,
 			EndDate:    data.DiscountEndDate.Time,
 			IsActive:   isActive,
 		}
-
-		// Calculate effective price
 		if isActive {
-			multiplier := float64(100-data.DiscountPercent.Int64) / 100.0
-			effectiveValue := (float64(data.BasePriceNumerator) / float64(data.BasePriceDenominator)) * multiplier
-			dto.EffectivePrice = contracts.MoneyDTO{
-				Numerator:    int64(effectiveValue * float64(data.BasePriceDenominator)),
-				Denominator:  data.BasePriceDenominator,
-				Float64Value: effectiveValue,
+			// Reuse the domain's exact rational arithmetic; the read path
+			// must not produce a different price from the write path.
+			if base, err := domain.NewMoney(data.BasePriceNumerator, data.BasePriceDenominator); err == nil {
+				if discounted, err := base.ApplyDiscount(int(data.DiscountPercent.Int64)); err == nil {
+					dto.EffectivePrice = contracts.MoneyDTO{
+						Numerator:    discounted.Numerator(),
+						Denominator:  discounted.Denominator(),
+						Float64Value: discounted.Float64(),
+					}
+				}
 			}
-		} else {
-			dto.EffectivePrice = dto.BasePrice
 		}
-	} else {
-		dto.EffectivePrice = dto.BasePrice
 	}
 
 	return dto

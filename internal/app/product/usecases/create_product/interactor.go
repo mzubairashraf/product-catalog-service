@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"product-catalog-service/internal/app/product/contracts"
-	"product-catalog-service/internal/app/product/domain"
-	"product-catalog-service/internal/app/product/repo"
-	"product-catalog-service/internal/pkg/clock"
-	"product-catalog-service/internal/pkg/committer"
+	"github.com/mzubairashraf/product-catalog-service/internal/app/product/contracts"
+	"github.com/mzubairashraf/product-catalog-service/internal/app/product/domain"
+	"github.com/mzubairashraf/product-catalog-service/internal/app/product/repo"
+	"github.com/mzubairashraf/product-catalog-service/internal/pkg/clock"
+	"github.com/mzubairashraf/product-catalog-service/internal/pkg/committer"
 )
 
 // Request defines the input for creating a product

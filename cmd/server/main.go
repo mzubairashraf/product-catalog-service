@@ -1,127 +1,91 @@
+// Command server runs the Product Catalog gRPC service.
 package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"cloud.google.com/go/spanner"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}	log.Println("\n👋 Shutting down gracefully...")	<-sigChan	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)	sigChan := make(chan os.Signal, 1)	// Wait for interrupt signal	_ = listProductsQuery	_ = removeDiscountUseCase	_ = applyDiscountUseCase	_ = deactivateProductUseCase	_ = activateProductUseCase	_ = updateProductUseCase	// Prevent unused variable warnings	log.Println("💡 Set CREATE_TEST_PRODUCT=true to create a test product on startup")	log.Println("📝 Note: gRPC handler implementation is pending")	log.Printf("\n🚀 Product Catalog Service is ready (port %s)", grpcPort)	}		}			}				log.Printf("✓ Retrieved product: %s - $%.2f", product.Name, product.BasePrice.Float64Value)			} else {				log.Printf("Failed to retrieve test product: %v", err)			if err != nil {			product, err := getProductQuery.Execute(ctx, productID)			// Try to retrieve it			log.Printf("✓ Test product created with ID: %s", productID)		} else {			log.Printf("Failed to create test product: %v", err)		if err != nil {		})			PriceDenominator: 100,			PriceNumerator:   1999,			Category:         "Electronics",			Description:      "A test product for verification",			Name:             "Test Product",		productID, err := createProductUseCase.Execute(ctx, create_product.Request{		log.Println("\n--- Creating test product ---")	if os.Getenv("CREATE_TEST_PRODUCT") == "true" {	// Example: Create a test product to verify everything works	// For now, we'll just keep the service running	// TODO: Initialize gRPC server and register handlers	log.Printf("✓ Queries: GetProduct, ListProducts")	log.Printf("✓ Commands: Create, Update, Activate, Deactivate, ApplyDiscount, RemoveDiscount")	log.Println("✓ All use cases initialized successfully")	// Log successful initialization	listProductsQuery := list_products.NewQuery(readModel)	getProductQuery := get_product.NewQuery(readModel)	// Initialize queries	removeDiscountUseCase := remove_discount.NewInteractor(productRepo, outboxRepo, commitService, clockService)	applyDiscountUseCase := apply_discount.NewInteractor(productRepo, outboxRepo, commitService, clockService)	deactivateProductUseCase := deactivate_product.NewInteractor(productRepo, outboxRepo, commitService, clockService)	activateProductUseCase := activate_product.NewInteractor(productRepo, outboxRepo, commitService, clockService)	updateProductUseCase := update_product.NewInteractor(productRepo, outboxRepo, commitService, clockService)	createProductUseCase := create_product.NewInteractor(productRepo, outboxRepo, commitService, clockService)	// Initialize use cases (commands)	readModel := repo.NewProductReadModel(client)	outboxRepo := repo.NewOutboxRepo()	productRepo := repo.NewProductRepo(client)	// Initialize repositories	commitService := committer.NewSpannerCommitter(client)	clockService := clock.NewRealClock()	// Initialize infrastructure	log.Println("Connected to Spanner database:", spannerDB)	defer client.Close()	}		log.Fatalf("Failed to create Spanner client: %v", err)	if err != nil {	client, err := spanner.NewClient(ctx, spannerDB)	}		log.Println("Using Spanner emulator at localhost:9010")		os.Setenv("SPANNER_EMULATOR_HOST", "localhost:9010")	if os.Getenv("SPANNER_EMULATOR_HOST") == "" {	// For emulator, set environment variable		spannerProjectID, spannerInstanceID, spannerDatabaseID)	spannerDB := fmt.Sprintf("projects/%s/instances/%s/databases/%s",	// Initialize Spanner client	ctx := context.Background()func main() {)	grpcPort          = "50051"	spannerDatabaseID = "product-catalog"	spannerInstanceID = "test-instance"	spannerProjectID  = "test-project"	// Spanner emulator configurationconst ()	"product-catalog-service/internal/pkg/committer"	"product-catalog-service/internal/pkg/clock"	"product-catalog-service/internal/app/product/usecases/update_product"	"product-catalog-service/internal/app/product/usecases/remove_discount"	"product-catalog-service/internal/app/product/usecases/deactivate_product"	"product-catalog-service/internal/app/product/usecases/create_product"	"product-catalog-service/internal/app/product/usecases/apply_discount"	"product-catalog-service/internal/app/product/usecases/activate_product"	"product-catalog-service/internal/app/product/repo"	"product-catalog-service/internal/app/product/queries/list_products"	"product-catalog-service/internal/app/product/queries/get_product"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/reflection"
+
+	"github.com/mzubairashraf/product-catalog-service/internal/bootstrap"
+	"github.com/mzubairashraf/product-catalog-service/internal/pkg/clock"
+	"github.com/mzubairashraf/product-catalog-service/internal/transport/grpcapi"
+	productpb "github.com/mzubairashraf/product-catalog-service/proto/product/v1"
+)
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, "server:", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+
+	// SPANNER_DATABASE is the full database path. The Spanner client itself
+	// honours SPANNER_EMULATOR_HOST, so the same binary runs against the
+	// emulator or a real instance without a code path of its own.
+	database := os.Getenv("SPANNER_DATABASE")
+	if database == "" {
+		return errors.New("SPANNER_DATABASE is required, e.g. projects/test-project/instances/test-instance/databases/product-catalog")
+	}
+	addr := os.Getenv("GRPC_ADDR")
+	if addr == "" {
+		addr = "127.0.0.1:50051"
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	client, err := spanner.NewClient(ctx, database)
+	if err != nil {
+		return fmt.Errorf("connecting to Spanner: %w", err)
+	}
+	defer client.Close()
+
+	server := grpc.NewServer(grpc.ChainUnaryInterceptor(grpcapi.Recovery(logger), grpcapi.Logging(logger)))
+	productpb.RegisterProductServiceServer(server, grpcapi.NewServer(bootstrap.NewApplication(client, clock.NewSystemClock()), logger))
+
+	healthServer := health.NewServer()
+	healthpb.RegisterHealthServer(server, healthServer)
+	reflection.Register(server) // lets grpcurl discover the API without the .proto
+
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	errc := make(chan error, 1)
+	go func() { errc <- server.Serve(listener) }()
+	logger.Info("listening", slog.String("addr", listener.Addr().String()), slog.String("database", database),
+		slog.Bool("emulator", os.Getenv("SPANNER_EMULATOR_HOST") != ""))
+
+	select {
+	case err := <-errc:
+		return err
+	case <-ctx.Done():
+	}
+
+	// Stop accepting calls and let in-flight ones finish, with a bound.
+	logger.Info("shutting down")
+	healthServer.Shutdown()
+	done := make(chan struct{})
+	go func() { server.GracefulStop(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(15 * time.Second):
+		server.Stop()
+	}
+	return nil
+}

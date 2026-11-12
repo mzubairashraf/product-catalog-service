@@ -3,8 +3,8 @@ package repo
 import (
 	"encoding/json"
 	"fmt"
-	"product-catalog-service/internal/app/product/contracts"
-	"product-catalog-service/internal/models/m_outbox"
+	"github.com/mzubairashraf/product-catalog-service/internal/app/product/contracts"
+	"github.com/mzubairashraf/product-catalog-service/internal/models/m_outbox"
 	"time"
 
 	"cloud.google.com/go/spanner"

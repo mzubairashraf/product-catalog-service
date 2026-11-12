@@ -3,7 +3,7 @@ package get_product
 import (
 	"context"
 
-	"product-catalog-service/internal/app/product/contracts"
+	"github.com/mzubairashraf/product-catalog-service/internal/app/product/contracts"
 )
 
 // Query handles retrieving a single product

@@ -1,21 +1,6 @@
-version: '3.8'
-
 services:
   spanner-emulator:
     image: gcr.io/cloud-spanner-emulator/emulator:latest
     ports:
-      - "9010:9010"
-      - "9020:9020"
-    environment:
-      - SPANNER_EMULATOR_HOST=localhost:9010
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9020"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - product-catalog-network
-
-networks:
-  product-catalog-network:
-    driver: bridge
+      - "9010:9010" # gRPC, used by the Go client
+      - "9020:9020" # REST

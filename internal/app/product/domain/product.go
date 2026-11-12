@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -42,10 +43,10 @@ type Product struct {
 // NewProduct creates a new product with validation
 // This is a factory method that ensures the product is created in a valid state
 func NewProduct(name, description, category string, basePrice *Money, now time.Time) (*Product, error) {
-	if name == "" {
+	if strings.TrimSpace(name) == "" {
 		return nil, ErrInvalidProductName
 	}
-	if category == "" {
+	if strings.TrimSpace(category) == "" {
 		return nil, ErrInvalidCategory
 	}
 	if basePrice == nil {
@@ -165,10 +166,10 @@ func (p *Product) Update(name, description, category string, now time.Time) erro
 		return ErrProductAlreadyArchived
 	}
 
-	if name == "" {
+	if strings.TrimSpace(name) == "" {
 		return ErrInvalidProductName
 	}
-	if category == "" {
+	if strings.TrimSpace(category) == "" {
 		return ErrInvalidCategory
 	}
 
@@ -237,7 +238,7 @@ func (p *Product) Deactivate(now time.Time) error {
 		return ErrProductAlreadyArchived
 	}
 	if p.status == ProductStatusInactive {
-		return nil // Already inactive, no-op
+		return ErrProductNotActive
 	}
 
 	p.status = ProductStatusInactive

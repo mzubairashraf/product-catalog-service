@@ -1,6 +1,8 @@
+// Package m_outbox is the persistence model of the outbox_events table.
 package m_outbox
 
 import (
+	"encoding/json"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -20,7 +22,7 @@ type Data struct {
 	EventID     string
 	EventType   string
 	AggregateID string
-	Payload     string // JSON payload
+	Payload     string // JSON document
 	Status      string
 	CreatedAt   time.Time
 	ProcessedAt spanner.NullTime
@@ -33,12 +35,12 @@ type Model struct {
 
 // NewModel creates a new outbox events table model
 func NewModel() *Model {
-	return &Model{
-		tableName: TableName,
-	}
+	return &Model{tableName: TableName}
 }
 
-// InsertMut creates an insert mutation for an outbox event
+// InsertMut creates an insert mutation for an outbox event. The payload
+// column has Spanner's JSON type, so the already-serialised document is
+// passed as raw JSON rather than as a string.
 func (m *Model) InsertMut(data *Data) *spanner.Mutation {
 	return spanner.Insert(
 		m.tableName,
@@ -47,25 +49,12 @@ func (m *Model) InsertMut(data *Data) *spanner.Mutation {
 			data.EventID,
 			data.EventType,
 			data.AggregateID,
-			data.Payload,
+			spanner.NullJSON{Value: json.RawMessage(data.Payload), Valid: true},
 			data.Status,
 			data.CreatedAt,
 			data.ProcessedAt,
 		},
 	)
-}
-
-// UpdateMut creates an update mutation for an outbox event
-func (m *Model) UpdateMut(eventID string, updates map[string]interface{}) *spanner.Mutation {
-	columns := []string{EventID}
-	values := []interface{}{eventID}
-
-	for col, val := range updates {
-		columns = append(columns, col)
-		values = append(values, val)
-	}
-
-	return spanner.Update(m.tableName, columns, values)
 }
 
 // TableName returns the table name

@@ -8,9 +8,9 @@ import (
 	"cloud.google.com/go/spanner"
 	"google.golang.org/grpc/codes"
 
-	"product-catalog-service/internal/app/product/contracts"
-	"product-catalog-service/internal/app/product/domain"
-	"product-catalog-service/internal/models/m_product"
+	"github.com/mzubairashraf/product-catalog-service/internal/app/product/contracts"
+	"github.com/mzubairashraf/product-catalog-service/internal/app/product/domain"
+	"github.com/mzubairashraf/product-catalog-service/internal/models/m_product"
 )
 
 // ProductRepo is the Spanner implementation of ProductRepository

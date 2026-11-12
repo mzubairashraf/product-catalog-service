@@ -58,7 +58,6 @@ type ListProductsRequest struct {
 
 // ProductList is the result of a list query
 type ProductList struct {
-	Products   []*ProductDTO
-	TotalCount int
-	HasMore    bool
+	Products []*ProductDTO
+	HasMore  bool
 }

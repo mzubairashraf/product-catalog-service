@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"product-catalog-service/internal/app/product/domain"
+	"github.com/mzubairashraf/product-catalog-service/internal/app/product/domain"
 
 	"cloud.google.com/go/spanner"
 )

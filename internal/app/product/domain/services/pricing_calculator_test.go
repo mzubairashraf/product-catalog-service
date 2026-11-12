@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"product-catalog-service/internal/app/product/domain"
+	"github.com/mzubairashraf/product-catalog-service/internal/app/product/domain"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

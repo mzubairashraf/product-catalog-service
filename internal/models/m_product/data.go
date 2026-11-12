@@ -9,19 +9,19 @@ import (
 // Data represents a product row in the database
 // This is the persistence model, separate from the domain model
 type Data struct {
-	ProductID            string
-	Name                 string
-	Description          string
-	Category             string
-	BasePriceNumerator   int64
-	BasePriceDenominator int64
-	DiscountPercent      spanner.NullInt64
-	DiscountStartDate    spanner.NullTime
-	DiscountEndDate      spanner.NullTime
-	Status               string
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
-	ArchivedAt           spanner.NullTime
+	ProductID            string            `spanner:"product_id"`
+	Name                 string            `spanner:"name"`
+	Description          string            `spanner:"description"`
+	Category             string            `spanner:"category"`
+	BasePriceNumerator   int64             `spanner:"base_price_numerator"`
+	BasePriceDenominator int64             `spanner:"base_price_denominator"`
+	DiscountPercent      spanner.NullInt64 `spanner:"discount_percent"`
+	DiscountStartDate    spanner.NullTime  `spanner:"discount_start_date"`
+	DiscountEndDate      spanner.NullTime  `spanner:"discount_end_date"`
+	Status               string            `spanner:"status"`
+	CreatedAt            time.Time         `spanner:"created_at"`
+	UpdatedAt            time.Time         `spanner:"updated_at"`
+	ArchivedAt           spanner.NullTime  `spanner:"archived_at"`
 }
 
 // Model provides type-safe operations for the products table

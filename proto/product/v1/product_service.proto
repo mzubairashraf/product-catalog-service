@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package product.v1;
 
-option go_package = "product-catalog-service/proto/product/v1;productpb";
+option go_package = "github.com/mzubairashraf/product-catalog-service/proto/product/v1;productpb";
 
 // ProductService provides operations for managing products
 service ProductService {
@@ -94,13 +94,13 @@ message GetProductReply {
 message ListProductsRequest {
     string category = 1;  // Optional filter
     string status = 2;    // Optional filter (active, inactive)
-    int32 limit = 3;
+    int32 limit = 3;      // Page size, 1-200; 0 means the default of 50
     int32 offset = 4;
 }
 
 message ListProductsReply {
     repeated Product products = 1;
-    int32 total_count = 2;
+    reserved 2; // was total_count, which reported the page size, not a total
     bool has_more = 3;
 }
 

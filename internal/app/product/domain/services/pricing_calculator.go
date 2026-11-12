@@ -1,7 +1,7 @@
 package services
 
 import (
-	"product-catalog-service/internal/app/product/domain"
+	"github.com/mzubairashraf/product-catalog-service/internal/app/product/domain"
 	"time"
 )
 

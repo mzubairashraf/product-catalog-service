@@ -24,7 +24,7 @@ func TestNewProduct(t *testing.T) {
 		assert.Equal(t, desc, product.Description())
 		assert.Equal(t, category, product.Category())
 		assert.True(t, product.BasePrice().Equals(basePrice))
-		assert.Equal(t, ProductStatusActive, product.Status())
+		assert.Equal(t, ProductStatusInactive, product.Status())
 		assert.Nil(t, product.Discount())
 	})
 
@@ -49,9 +49,9 @@ func TestNewProduct(t *testing.T) {
 		assert.Equal(t, "", product.Description())
 	})
 
-	t.Run("sets status to Active by default", func(t *testing.T) {
+	t.Run("new products start inactive", func(t *testing.T) {
 		product, _ := NewProduct(name, desc, category, basePrice, now)
-		assert.Equal(t, ProductStatusActive, product.Status())
+		assert.Equal(t, ProductStatusInactive, product.Status())
 	})
 
 	t.Run("emits ProductCreated event", func(t *testing.T) {
@@ -59,7 +59,7 @@ func TestNewProduct(t *testing.T) {
 		events := product.DomainEvents()
 		require.Len(t, events, 1)
 
-		event, ok := events[0].(ProductCreatedEvent)
+		event, ok := events[0].(*ProductCreatedEvent)
 		require.True(t, ok)
 		assert.Equal(t, product.ID(), event.AggregateID())
 		assert.Equal(t, name, event.Name)
@@ -112,7 +112,7 @@ func TestProduct_ApplyDiscount(t *testing.T) {
 	now := time.Now()
 
 	t.Run("applies discount successfully", func(t *testing.T) {
-		product := createTestProduct(t)
+		product := createActiveProduct(t)
 		discount, _ := NewDiscount(20, now.Add(-1*time.Hour), now.Add(24*time.Hour))
 
 		err := product.ApplyDiscount(discount, now)
@@ -122,7 +122,7 @@ func TestProduct_ApplyDiscount(t *testing.T) {
 	})
 
 	t.Run("fails when discount already active", func(t *testing.T) {
-		product := createTestProduct(t)
+		product := createActiveProduct(t)
 		discount1, _ := NewDiscount(20, now.Add(-1*time.Hour), now.Add(24*time.Hour))
 		discount2, _ := NewDiscount(30, now.Add(-1*time.Hour), now.Add(48*time.Hour))
 
@@ -134,7 +134,7 @@ func TestProduct_ApplyDiscount(t *testing.T) {
 	})
 
 	t.Run("tracks discount change", func(t *testing.T) {
-		product := createTestProduct(t)
+		product := createActiveProduct(t)
 
 		discount, _ := NewDiscount(20, now.Add(-1*time.Hour), now.Add(24*time.Hour))
 		err := product.ApplyDiscount(discount, now)
@@ -148,7 +148,7 @@ func TestProduct_RemoveDiscount(t *testing.T) {
 	now := time.Now()
 
 	t.Run("removes active discount", func(t *testing.T) {
-		product := createTestProduct(t)
+		product := createActiveProduct(t)
 		discount, _ := NewDiscount(20, now.Add(-1*time.Hour), now.Add(24*time.Hour))
 		product.ApplyDiscount(discount, now)
 
@@ -158,14 +158,14 @@ func TestProduct_RemoveDiscount(t *testing.T) {
 	})
 
 	t.Run("fails when no discount active", func(t *testing.T) {
-		product := createTestProduct(t)
+		product := createActiveProduct(t)
 
 		err := product.RemoveDiscount(now)
 		assert.ErrorIs(t, err, ErrNoActiveDiscount)
 	})
 
 	t.Run("tracks discount removal", func(t *testing.T) {
-		product := createTestProduct(t)
+		product := createActiveProduct(t)
 		discount, _ := NewDiscount(20, now.Add(-1*time.Hour), now.Add(24*time.Hour))
 		product.ApplyDiscount(discount, now)
 
@@ -180,7 +180,7 @@ func TestProduct_Deactivate(t *testing.T) {
 	now := time.Now()
 
 	t.Run("deactivates active product", func(t *testing.T) {
-		product := createTestProduct(t)
+		product := createActiveProduct(t)
 
 		err := product.Deactivate(now)
 		require.NoError(t, err)
@@ -188,7 +188,7 @@ func TestProduct_Deactivate(t *testing.T) {
 	})
 
 	t.Run("fails when already inactive", func(t *testing.T) {
-		product := createTestProduct(t)
+		product := createActiveProduct(t)
 		product.Deactivate(now)
 
 		err := product.Deactivate(now)
@@ -196,7 +196,7 @@ func TestProduct_Deactivate(t *testing.T) {
 	})
 
 	t.Run("tracks status change", func(t *testing.T) {
-		product := createTestProduct(t)
+		product := createActiveProduct(t)
 
 		err := product.Deactivate(now)
 		require.NoError(t, err)
@@ -209,7 +209,7 @@ func TestProduct_Activate(t *testing.T) {
 	now := time.Now()
 
 	t.Run("activates inactive product", func(t *testing.T) {
-		product := createTestProduct(t)
+		product := createActiveProduct(t)
 		product.Deactivate(now)
 
 		err := product.Activate(now)
@@ -218,14 +218,14 @@ func TestProduct_Activate(t *testing.T) {
 	})
 
 	t.Run("fails when already active", func(t *testing.T) {
-		product := createTestProduct(t)
+		product := createActiveProduct(t)
 
 		err := product.Activate(now)
 		assert.ErrorIs(t, err, ErrProductAlreadyActive)
 	})
 
 	t.Run("tracks status change", func(t *testing.T) {
-		product := createTestProduct(t)
+		product := createActiveProduct(t)
 		product.Deactivate(now)
 
 		err := product.Activate(now)
@@ -239,16 +239,15 @@ func TestProduct_EffectivePrice(t *testing.T) {
 	now := time.Now()
 
 	t.Run("returns base price with no discount", func(t *testing.T) {
-		product := createTestProduct(t)
+		product := createActiveProduct(t)
 
 		effectivePrice := product.EffectivePrice(now)
 		assert.True(t, effectivePrice.Equals(product.BasePrice()))
 	})
 
 	t.Run("returns discounted price with active discount", func(t *testing.T) {
-		product := createTestProduct(t)
-		basePrice, _ := NewMoney(10000, 100)
-		product, _ = NewProduct("Test", "Desc", "Cat", basePrice, now)
+		product := createActiveProduct(t)
+		basePrice := product.BasePrice()
 
 		discount, _ := NewDiscount(20, now.Add(-1*time.Hour), now.Add(1*time.Hour))
 		product.ApplyDiscount(discount, now)
@@ -270,4 +269,14 @@ func createTestProduct(t *testing.T) *Product {
 	product, err := NewProduct(name, desc, category, basePrice, now)
 	require.NoError(t, err)
 	return product
+}
+
+// createActiveProduct returns a stored, active product with a clean change
+// tracker and no pending events, as a repository would load it.
+func createActiveProduct(t *testing.T) *Product {
+	t.Helper()
+	basePrice, err := NewMoney(10000, 100)
+	require.NoError(t, err)
+	now := time.Now().Add(-time.Hour)
+	return LoadProduct("prod-1", "Test Product", "Test Description", "Test Category", basePrice, nil, ProductStatusActive, now, now, nil)
 }

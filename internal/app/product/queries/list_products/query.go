@@ -3,7 +3,7 @@ package list_products
 import (
 	"context"
 
-	"product-catalog-service/internal/app/product/contracts"
+	"github.com/mzubairashraf/product-catalog-service/internal/app/product/contracts"
 )
 
 // Query handles listing products with filtering and pagination
